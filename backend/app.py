@@ -6,21 +6,23 @@ from discord.ext import commands
 from openai import OpenAI
 import asyncio
 import datetime
+import requests
+import json
+import pytz
+from typing import List
 
 load_dotenv()
 
 # Get environment variables
 token = os.getenv('DISCORD_TOKEN')
 base_url = os.getenv("BASE_URL")
-api_key=os.getenv("NEBIUS_API_KEY")
+api_key = os.getenv("NEBIUS_API_KEY")
 
-
-# initialize LLM (nebius) client
+# Initialize LLM client
 client = OpenAI(
     base_url=base_url,
     api_key=api_key,
 )
-
 
 description = 'A Discord bot that can summarize conversations'
 
