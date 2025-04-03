@@ -7,22 +7,35 @@ from openai import OpenAI
 import asyncio
 import datetime
 import requests
+import uuid
+from discord.ui import View, Button
+import redis
 import json
-import pytz
-from typing import List
-
+import hashlib
+import time
 load_dotenv()
 
 # Get environment variables
 token = os.getenv('DISCORD_TOKEN')
 base_url = os.getenv("BASE_URL")
 api_key = os.getenv("NEBIUS_API_KEY")
+serper_api_key = os.getenv("SERPER_API_KEY")
+redis_url = os.getenv("REDIS_URL")  # Connection string for Redis
 
 # Initialize LLM client
 client = OpenAI(
     base_url=base_url,
     api_key=api_key,
 )
+
+# Initialize Redis client (if available)
+redis_client = None
+if redis_url:
+    try:
+        redis_client = redis.from_url(redis_url)
+        print("Redis cache initialized")
+    except Exception as e:
+        print(f"Failed to connect to Redis: {e}")
 
 description = 'A Discord bot that can summarize conversations'
 
@@ -137,6 +150,271 @@ async def summarize(
         
     except Exception as e:
         print(f"Error in summarize command: {e}")
+        await interaction.followup.send(f"Sorry, I encountered an error: {str(e)}")
+
+# Add a function to generate cache keys
+def generate_cache_key(query, vendor=None):
+    """Generate a cache key for Redis."""
+    cache_key = f"product_search:{query}"
+    if vendor:
+        cache_key += f":{vendor}"
+    # Create a hash to ensure valid Redis key
+    return hashlib.md5(cache_key.encode()).hexdigest()
+
+# Update your search_products function to use the cache
+async def search_products(query, vendor=None):
+    """Search for products either generically or from a specific vendor."""
+    try:
+        # Generate cache key
+        cache_key = generate_cache_key(query, vendor)
+        
+        # Try to get from cache first
+        if redis_client:
+            cached_data = redis_client.get(cache_key)
+            if cached_data:
+                print(f"Cache hit for query: {query}")
+                return json.loads(cached_data)
+        
+        # If not in cache or no Redis, perform the search
+        if vendor:
+            results = await search_vendor_products(query, vendor)
+        else:
+            results = await search_generic_products(query)
+            
+        # Store in cache if Redis is available
+        if redis_client and results:
+            # Cache for 30 minutes
+            redis_client.setex(
+                cache_key, 
+                1800,  # 30 minutes in seconds
+                json.dumps(results, default=str)  # Handle any non-serializable data
+            )
+            
+        return results
+    except Exception as e:
+        print(f"Error searching for products: {e}")
+        return None
+
+async def search_generic_products(query):
+    """Search for products using Serper.dev API."""
+    try:
+        headers = {
+            'X-API-KEY': serper_api_key,
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            "q": f"{query} buy online",
+            "gl": "us",
+            "hl": "en",
+            "autocorrect": True,
+            "type": "shopping"
+        }
+        
+        # Run the API call in a separate thread since it's blocking
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: requests.post(
+                'https://google.serper.dev/search',
+                headers=headers,
+                json=payload
+            )
+        )
+        
+        if response.status_code != 200:
+            print(f"Error from Serper API: {response.status_code}, {response.text}")
+            return []
+        
+        results = response.json()
+        
+        if "shopping" not in results:
+            return []
+        
+        products = []
+        for item in results["shopping"][:5]:  # Limit to top 5 results
+            product = {
+                "name": item.get("title", "Unknown Product"),
+                "price": item.get("price", "N/A"),
+                "vendor": item.get("source", "Unknown"),
+                "link": item.get("link", "#"),
+                "image": item.get("imageUrl"),
+                "shipping": "Check website for shipping details",  # Serper doesn't provide shipping info directly
+                "rating": f"{item.get('rating', 'N/A')}" if 'rating' in item else "N/A"
+            }
+            products.append(product)
+        
+        return products
+    except Exception as e:
+        print(f"Error in generic product search: {e}")
+        return []
+
+async def search_vendor_products(query, vendor):
+    """Search for products from a specific vendor using Serper.dev."""
+    # List of supported vendors with their domains
+    vendors = {
+        "digikey": "digikey.com",
+        "mouser": "mouser.com",
+        "amazon": "amazon.com", 
+        "mcmaster": "mcmaster.com",
+        "sparkfun": "sparkfun.com",
+        "adafruit": "adafruit.com",
+        "grainger": "grainger.com",
+        "summit": "summitracing.com",
+        "rockauto": "rockauto.com"
+    }
+    
+    # Check if vendor is supported
+    vendor = vendor.lower()
+    if vendor not in vendors:
+        return {"error": f"Vendor '{vendor}' not supported. Supported vendors: {', '.join(vendors.keys())}"}
+    
+    # For vendor-specific search, add the vendor name to the shopping query
+    vendor_modified_query = f"{query} {vendor}"
+    
+    try:
+        headers = {
+            'X-API-KEY': serper_api_key,
+            'Content-Type': 'application/json'
+        }
+        
+        # Use shopping search with vendor in query
+        payload = {
+            "q": vendor_modified_query,
+            "gl": "us",
+            "hl": "en",
+            "autocorrect": True,
+            "type": "shopping"  # Use shopping search type
+        }
+        
+        # Run the API call in a separate thread since it's blocking
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: requests.post(
+                'https://google.serper.dev/search',
+                headers=headers,
+                json=payload
+            )
+        )
+        
+        if response.status_code != 200:
+            print(f"Error from Serper API: {response.status_code}, {response.text}")
+            return []
+        
+        results = response.json()
+        
+        # Check if shopping results exist
+        if "shopping" not in results or not results["shopping"]:
+            print(f"No shopping results found for {vendor_modified_query}")
+            return []
+        
+        # Filter for results that match the vendor domain
+        vendor_domain = vendors[vendor]
+        
+        products = []
+        for item in results["shopping"]:
+            # Check if this result is from the right vendor
+            is_from_vendor = False
+            if "source" in item and vendor_domain.lower() in item["source"].lower():
+                is_from_vendor = True
+            elif "link" in item and vendor_domain.lower() in item["link"].lower():
+                is_from_vendor = True
+                
+            if is_from_vendor:
+                product = {
+                    "name": item.get("title", "Unknown Product"),
+                    "price": item.get("price", "N/A"),
+                    "vendor": vendor,
+                    "link": item.get("link", "#"),
+                    "image": item.get("imageUrl") if "imageUrl" in item else None,
+                    "shipping": item.get("shipping", "Check website for shipping details"),
+                    "rating": f"{item.get('rating', 'N/A')}" if 'rating' in item else "N/A"
+                }
+                products.append(product)
+                
+                # Limit to 5 vendor-specific results
+                if len(products) >= 5:
+                    break
+        
+        return products
+    except Exception as e:
+        print(f"Error in vendor-specific search: {e}")
+        return []
+
+@bot.tree.command(name="lookup", description="Look up product information")
+@app_commands.describe(
+    query="The product you want to search for",
+    vendor="Optional: Specific vendor to search (digikey, mouser, amazon)"
+)
+async def lookup(interaction: discord.Interaction, query: str, vendor: str = None):
+    """Command to look up product information."""
+    await interaction.response.defer(thinking=True)
+    
+    try:
+        products = await search_products(query, vendor)
+        
+        if not products:
+            await interaction.followup.send(f"No results found for '{query}'.")
+            return
+        
+        if isinstance(products, dict) and "error" in products:
+            await interaction.followup.send(products["error"])
+            return
+        
+        # Create an embed for each product
+        embeds = []
+        for i, product in enumerate(products[:5]):  # Limit to 5 products max
+            embed = discord.Embed(
+                title=product["name"],
+                url=product["link"],
+                description=f"Vendor: {product['vendor']}",
+                color=discord.Color.green()
+            )
+            embed.add_field(name="Price", value=product["price"], inline=True)
+            embed.add_field(name="Shipping", value=product["shipping"], inline=True)
+            
+            if product["rating"] != "N/A":
+                embed.add_field(name="Rating", value=product["rating"], inline=True)
+                
+            if product["image"]:
+                embed.set_thumbnail(url=product["image"])
+                
+            embeds.append(embed)
+        
+        # Create pagination view with buttons
+        class ProductPaginator(View):
+            def __init__(self, embeds):
+                super().__init__(timeout=60)  # 60-second timeout
+                self.embeds = embeds
+                self.current_page = 0
+                self.total_pages = len(embeds)
+            
+            @discord.ui.button(label="Previous", style=discord.ButtonStyle.gray)
+            async def previous_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                self.current_page = (self.current_page - 1) % self.total_pages
+                embed = self.embeds[self.current_page]
+                embed.set_footer(text=f"Page {self.current_page + 1}/{self.total_pages}")
+                await interaction.response.edit_message(embed=embed)
+            
+            @discord.ui.button(label="Next", style=discord.ButtonStyle.gray)
+            async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                self.current_page = (self.current_page + 1) % self.total_pages
+                embed = self.embeds[self.current_page]
+                embed.set_footer(text=f"Page {self.current_page + 1}/{self.total_pages}")
+                await interaction.response.edit_message(embed=embed)
+        
+        # Create the paginator
+        paginator = ProductPaginator(embeds)
+        
+        # Add page info to first embed
+        embeds[0].set_footer(text=f"Page 1/{len(embeds)}")
+        
+        # Send the first embed with the paginator
+        await interaction.followup.send(embed=embeds[0], view=paginator)
+    
+    except Exception as e:
+        print(f"Error in lookup command: {e}")
         await interaction.followup.send(f"Sorry, I encountered an error: {str(e)}")
 
 @bot.command()
