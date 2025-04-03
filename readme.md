@@ -33,9 +33,9 @@ A specialized Discord bot designed for the Bearcats Racing team server to stream
 
 | Command | Description |
 |---------|-------------|
-| `!summarize` | Summarizes the last 50 messages in the channel |
-| `!schedule` | Creates a new meeting event in Outlook |
-| `!lookup <item>` | Searches for racing components across vendors |
+| `/summarize <years/months/days/hours> ` | Specify the time period youre trying to summarize |
+| `/schedule` | Creates a new meeting event in Outlook |
+| `/lookup <item>` | Searches for racing components across vendors |
 
 ## Technologies Used
 - python
