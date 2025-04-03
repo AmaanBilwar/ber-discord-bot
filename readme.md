@@ -24,10 +24,10 @@ A specialized Discord bot designed for the Bearcats Racing team server to stream
 ## Setup Instructions
 
 1. Clone this repository
-2. Install required dependencies: `npm install`
+2. Install required dependencies: `pip -r install requirements.txt`
 3. Configure environment variables (see `.env.example`)
 4. Set up Outlook API credentials
-5. Run the bot: `npm start`
+5. Run the bot: `python backend/app.py`
 
 ## Commands
 
