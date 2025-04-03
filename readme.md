@@ -33,7 +33,7 @@ A specialized Discord bot designed for the Bearcats Racing team server to stream
 
 | Command | Description |
 |---------|-------------|
-| `/summarize ` | (with options like 'years, months, days, hours followed by an integer value to specify the time period youre trying to summarize') |
+| `/summarize ` | With options like 'years, months, days, hours' followed by an integer value to specify the time period youre trying to summarize |
 | `/schedule` | Creates a new meeting event in Outlook |
 | `/lookup <item>` | Searches for racing components across vendors |
 
