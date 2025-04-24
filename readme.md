@@ -15,12 +15,15 @@ A specialized Discord bot designed for the Bearcats Racing team server to stream
 - Provides technical specifications and compatibility information
 - Tracks price changes and availability for critical parts
 
-### Meeting Scheduler
-- Seamlessly integrates with Outlook calendars
-- Creates and manages team meeting events
-- Sends reminders and meeting links to relevant team members
-- Prevents scheduling conflicts with existing team events
-
+### Meeting Schedule Viewer
+- Displays meeting times for general body meetings and sub-team meetings
+- Provides options to view:
+  - General body meeting schedule
+  - Individual sub-team meeting schedules
+  - Complete schedule of all meetings
+- Shows meeting details including:
+  - Day and time
+  - Location
 
 ## Setup Instructions
 
@@ -36,7 +39,7 @@ A specialized Discord bot designed for the Bearcats Racing team server to stream
 |---------|-------------|---------|
 | `/summarize <years/months/days/hours> ` | Summarize recent conversations | hours, days, months, years - Specify time period to summarize |
 | `/lookup <item>` | Search for products and components | query - Product to search for<br>vendor - Optional: Specific vendor to search (digikey, mouser, amazon, etc.) | 
-| `/meetings` | Shows the list and timings of all sub-team meetings in a place which is only visible to the user who asked for the time | 
+| `/meetings` | Shows the list and timings of all sub-team meetings in a place which is only visible to the user who asked for the time | after the command is sent out, gives options to view general, sub-team, or all meetings
 
 ## Technologies Used
 
@@ -97,15 +100,15 @@ The product lookup feature supports multiple vendors including DigiKey, Mouser, 
 
 ## Environment Variables
 
-``` DISCORD_TOKEN=your_discord_bot_token
-    BASE_URL=your_llm_api_base_url
-    NEBIUS_API_KEY=your_nebius_api_key
-    SERPER_API_KEY=your_serper_api_key
-    REDIS_URL=your_redis_connection_string 
+``` 
+    DISCORD_TOKEN=MTM......
+    NEBIUS_API_KEY=ey.....
+    BASE_URL=htt.....
+    SERPER_API_KEY=97343.....
 ```
 
 ## Contributing
-Interested in contributing? We welcome improvements to any aspect of the bot. Check our contribution guidelines for more information.
+Interested in contributing? I welcome any improvements to any aspect of the bot. Check our contribution guidelines for more information.
 
 ## License
 This project is licensed under the MIT License - see the LICENSE file for details.
