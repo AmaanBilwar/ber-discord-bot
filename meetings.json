@@ -1,0 +1,52 @@
+{
+    "meetings" : [
+        {
+            "meeting_name" : "General Meeting",
+            "meeting_days" : "Mondays",
+            "meeting_time" : "5pm",
+            "meeting_location" : "CRC 3200"
+        },
+        {
+            "meeting_name" : "Drivetrain",
+            "meeting_days" : "Wednesdays",
+            "meeting_time" : "1.30pm - 2.30pm ",
+            "meeting_location" : "Rhodes 407"
+        },
+        {
+            "meeting_name" : "Suspension",
+            "meeting_days" : "Wednesdays",
+            "meeting_time" : "2pm - 3:30pm  ",
+            "meeting_location" : "Rhodes 509"
+        },
+        {
+            "meeting_name" : "Electronics",
+            "meeting_days" : "Wednesdays",
+            "meeting_time" : "5pm - 6pm ",
+            "meeting_location" : "Bearcats Racing Shop"
+        },
+        {
+            "meeting_name" : "Frame",
+            "meeting_days" : "Thursdays",
+            "meeting_time" : "11:30am - 12:30pm",
+            "meeting_location" : "Rhodes 700"
+        },
+        {
+            "meeting_name" : "Powertrain",
+            "meeting_days" : "Thursdays",
+            "meeting_time" : "4pm - 5pm",
+            "meeting_location" : "Bearcats Racing Shop"
+        },
+        {
+            "meeting_name" : "Battery",
+            "meeting_days" : "Fridays",
+            "meeting_time" : "4pm - 5pm",
+            "meeting_location" : "Bearcats Racing Shop"
+        },
+        {
+            "meeting_name" : "Aerodynamics",
+            "meeting_days" : "Mondays",
+            "meeting_time" : "3pm - 4pm",
+            "meeting_location" : "Rhodes 407 or GMS"
+        }
+    ]
+}
