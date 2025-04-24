@@ -342,6 +342,86 @@ async def search_vendor_products(query, vendor):
         print(f"Error in vendor-specific search: {e}")
         return []
 
+@bot.tree.command(name="meetings", description="Get the latest meeting timings")
+async def meetings(interaction: discord.Interaction):
+    """Command to get the latest meeting timings."""
+    await interaction.response.defer(thinking=True)
+    try:
+        with open('meetings.json', 'r') as f:
+            meetings_data = json.load(f)
+            
+        # Create a list of meeting names for the user to choose from
+        meeting_names = [meeting['meeting_name'] for meeting in meetings_data['meetings']]
+        meeting_names.append("all")
+        
+        # Create a view with buttons for each meeting
+        class MeetingView(View):
+            def __init__(self):
+                super().__init__(timeout=60)
+                for name in meeting_names:
+                    self.add_item(Button(label=name, custom_id=name))
+            
+            async def interaction_check(self, interaction: discord.Interaction) -> bool:
+                return True
+            
+            async def on_timeout(self):
+                for item in self.children:
+                    item.disabled = True
+        
+        # Send initial message with buttons
+        view = MeetingView()
+        await interaction.followup.send(
+            "Please select a meeting to view its details or 'all' to see all meetings:",
+            view=view,
+            ephemeral=True
+        )
+        
+        # Wait for button interaction
+        try:
+            interaction = await bot.wait_for(
+                "interaction",
+                check=lambda i: i.data["custom_id"] in meeting_names,
+                timeout=60
+            )
+            
+            if interaction.data["custom_id"] == "all":
+                # Show all meetings
+                embed = discord.Embed(
+                    title="All Meeting Schedules",
+                    description="Here are all the team meeting times:",
+                    color=discord.Color.blue()
+                )
+                for meeting in meetings_data['meetings']:
+                    embed.add_field(
+                        name=meeting['meeting_name'],
+                        value=f"**Day:** {meeting['meeting_days']}\n**Time:** {meeting['meeting_time']}\n**Location:** {meeting['meeting_location']}",
+                        inline=False
+                    )
+            else:
+                # Show specific meeting
+                selected_meeting = next(
+                    (m for m in meetings_data['meetings'] if m['meeting_name'] == interaction.data["custom_id"]),
+                    None
+                )
+                if selected_meeting:
+                    embed = discord.Embed(
+                        title=f"{selected_meeting['meeting_name']} Meeting Details",
+                        color=discord.Color.blue()
+                    )
+                    embed.add_field(
+                        name="Schedule",
+                        value=f"**Day:** {selected_meeting['meeting_days']}\n**Time:** {selected_meeting['meeting_time']}\n**Location:** {selected_meeting['meeting_location']}",
+                        inline=False
+                    )
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            
+        except asyncio.TimeoutError:
+            await interaction.followup.send("Selection timed out. Please try again.", ephemeral=True)
+    except Exception as e:
+        print(f"Error in meetings command: {e}")
+        await interaction.followup.send(f"Sorry, I encountered an error: {str(e)}")
+
 @bot.tree.command(name="lookup", description="Look up product information")
 @app_commands.describe(
     query="The product you want to search for",
